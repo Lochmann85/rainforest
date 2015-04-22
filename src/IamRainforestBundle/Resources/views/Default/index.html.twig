@@ -1,0 +1,528 @@
+{% extends 'base.html.twig' %}
+
+{% block title 'Rainforest' %}
+
+{% block stylesheets %}
+    <link rel="stylesheet" type="text/css" href="https://www.iamstudent.at/css/iamstudent.css"/>
+    <link rel="stylesheet" type="text/css" href="css/styles.css"/>
+    <style type="text/css">
+        .squareSize {width:{{ map.getSquareWidth }}px;height:{{ map.getSquareHeight }}px;}
+        #grid-container {position:relative;left:0px;width:{{ mapEntity.getWidth }}px;top:0px;height:{{ mapEntity.getHeight }}px;}
+    </style>
+{% endblock %}
+
+{% block body %}
+    <div class="container-fluid panel panel-default panel-standalone">
+        <div class="row">
+            <div class="col-xs-10">
+                <h2>{{ mapEntity.getDescription | raw }}</h2>
+            </div>
+        </div>
+        <div class="row">
+            <div class="col-xs-10">
+                Finde deinen Baum:
+            </div>
+        </div>
+        <form id="square-finder-form" class="row">
+            <input type="hidden" name="map-id" value="{{ mapEntity.getId }}"/>
+            <fieldset>
+                <div class="col-xs-2">
+                    <div class="input-group">
+                        <span class="input-group-addon">
+                            <i class="fa fa-envelope text-jumbo margin-right-half margin-left-half"></i>
+                        </span>
+                        <input class="form-control" type="email" placeholder="Deine E-Mail-Adresse" name="email">
+                    </div>
+                </div>
+                <button id="square-finder-submit" type="submit" form="square-finder-form" class="btn btn-lg btn-iams">Suchen</button>
+            </fieldset>
+        </form>
+        <div class="row">
+            <div class="col-xs-3">
+                <div id="square-finder-error" class="alert alert-danger">
+                    <span></span>
+                </div>
+            </div>
+        </div>
+        <form id="counter-form" class="row">
+            <fieldset>
+                <div class="col-xs-2">
+                    <div class="input-group">
+                        <span class="input-group-addon">
+                            <i class="fa fa-tree text-jumbo margin-right-half margin-left-half"></i>
+                        </span>
+                        <input class="form-control" type="text" name="counter" disabled>
+                    </div>
+                </div>
+            </fieldset>
+        </form>
+        <div class="row">
+            <div class="col-xs-12">
+                <button id="goLeft" type="button">links</button>
+                <button id="goRight" type="button">rechts</button>
+                <button id="goUp" type="button">oben</button>
+                <button id="goDown" type="button">unten</button>
+            </div>
+        </div>
+        <div id="grid-viewport">
+            <div id="grid-container">
+                <img id="rainforest" src="{{ mapEntity.getImageUrl }}" width="100%"/>
+                <div class="foreground">
+                    {{ map.getGridOfSquaresAsDivs | raw }}
+                </div>
+                <canvas id="grid">Your browser does not support canvas</canvas>
+            </div>
+        </div>
+        <canvas id="marker" width="26px" height="52px"></canvas>
+        <div id="square-container">
+            <button id="square-close" type="button" class="close">×</button>
+            <div id="square-content"></div>
+            <div id="square-form-row">
+                <div class="row">
+                    <div class="col-xs-10">
+                        <button id="square-form-submit" type="submit" class="btn btn-iams pull-right">Retten</button>
+                    </div>
+                </div>
+                <div id="square-form-error" class="alert alert-danger"><span></span></div>
+            </div>
+        </div>
+        <div id="login" class="modal fade" aria-hidden="true" aria-labelledby="loginModalLabel" tabindex="-1">
+            <div class="modal-dialog">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <button type="button" class="close" data-dismiss="modal" aria-hidden="true">×</button>
+                        <h4 class="modal-title" id="loginModalLabel">Login</h4>
+                    </div>
+                    <div class="modal-body">
+                        Bitte einloggen / registrieren
+                    </div>
+                    <div class="modal-footer">
+                        <span class="text-small">falls du dich nicht registrieren möchtest klicke auf X</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+{% endblock %}
+
+{% block javascripts %}
+    <script type="text/javascript" src="js/jquery.min.js"></script>
+    <script type="text/javascript" src="js/bootstrap.min.js"></script>
+    <script type="text/javascript" src="js/main.js"></script>
+    <script type="text/javascript">
+    /*<![CDATA[*/
+    {% if(isGuest) %}
+        $("#login").modal("show");
+    {% endif %}
+
+    var gridViewport = $('#grid-viewport');
+    var gridContainer = $('#grid-container');
+    var gridContainerLeft = 0;
+    var gridContainerTop = 0;
+
+    var grid = $('#grid');
+    grid[0].width = {{ mapEntity.getWidth }} + 1;
+    grid[0].height = {{ mapEntity.getHeight }} + 1;
+    var gridContext = grid[0].getContext('2d');
+    var gridLineWidth = 1;
+
+    var numberX = {{ mapEntity.getNumberX }},
+        diffX = {{ map.getSquareWidth }};
+    var numberY = {{ mapEntity.getNumberY }},
+        diffY = {{ map.getSquareHeight }};
+    
+
+    var marker = $('#marker');
+    var markerContext = marker[0].getContext('2d');
+    var markerCoord = {X: 0, Y: 0};
+
+    var squareContainer = $('#square-container');
+
+
+    window.addEventListener('resize', resizeGridViewportOnBrowserResize );
+    function resizeGridViewportOnBrowserResize() {
+        resizeGridViewport();
+        offsetLeftViewport = gridViewport.offset().left;
+        offsetTopViewport = gridViewport.offset().top;
+        widthViewport = gridViewport.outerWidth();
+        clearViewportSelection();
+        gridContainerLeft = 0;
+        gridContainerTop = 0;
+        gridContainer.removeAttr('style');
+    };
+    function clearViewportSelection() {
+        clearMarker();
+        squareContainer.fadeOut('fast');
+    };
+
+    resizeGridViewport();
+
+    function resizeGridViewport() {
+        var bodyWidth = $('body').width();
+        if (bodyWidth <= 767) {
+            setUpGridViewport(bodyWidth * 0.95);
+        }
+        else if (bodyWidth <= 991) {
+            setUpGridViewport(parseInt(bodyWidth * 0.9));
+        }
+        else if (bodyWidth <= 1199) {
+            setUpGridViewport(parseInt(bodyWidth * 0.8));
+        }
+        else {
+            setUpGridViewport(parseInt(bodyWidth * 0.7));
+        }
+    };
+    function setUpGridViewport(width) {
+        gridViewport.width(biggestGridSize(width, diffX, numberX));
+        gridViewport.height(biggestGridSize(gridViewport.width(), diffY, numberY));
+    };
+    function biggestGridSize(width, squareSize, squareNumber) {
+        var ratio = Math.floor(width / squareSize);
+        if (ratio >= squareNumber) {
+            ratio = squareNumber;
+        }
+        return ratio * squareSize + gridLineWidth;
+    };
+    
+    
+    $('#goLeft').click(function(event) {
+        var hiddenSquares = numberX - Math.floor(gridViewport.width() / diffX);
+        gridContainerLeft = raiseIfInsideBoundingBox(gridContainerLeft, hiddenSquares);
+        
+        var offsetInPixel = -gridContainerLeft * diffX;
+        gridContainer.css('left', offsetInPixel + 'px');
+
+        clearViewportSelection()
+    });
+    $('#goRight').click(function(event) {
+        gridContainerLeft = decreaseIfInsideBoundingBox(gridContainerLeft, 0);
+        
+        var offsetInPixel = -gridContainerLeft * diffX;
+        gridContainer.css('left', offsetInPixel + 'px');
+        
+        clearViewportSelection()
+    });
+    $('#goDown').click(function(event) {
+        var hiddenSquares = numberY - Math.floor(gridViewport.height() / diffY);
+        gridContainerTop = raiseIfInsideBoundingBox(gridContainerTop, hiddenSquares);
+        
+        var offsetInPixel = -gridContainerTop * diffY;
+        gridContainer.css('top', offsetInPixel + 'px');
+        
+        clearViewportSelection()
+    });
+    $('#goUp').click(function(event) {
+        gridContainerTop = decreaseIfInsideBoundingBox(gridContainerTop, 0);
+        
+        var offsetInPixel = -gridContainerTop * diffY;
+        gridContainer.css('top', offsetInPixel + 'px');
+        
+        clearViewportSelection()
+    });
+    function raiseIfInsideBoundingBox(offset, border) {
+        markerCoord['X'] = markerCoord['X'] - 1;
+        return offset + 1 > border ? offset : offset + 1;
+    };
+    function decreaseIfInsideBoundingBox(offset, border) {
+        return offset - 1 < border ? offset : offset - 1;
+    };
+    
+
+    fillWithBackground();
+    cutOutUsedSquares();
+    drawGrid();
+
+    function fillWithBackground() {
+        gridContext.clearRect(0, 0, grid[0].width, grid[0].height);
+        gridContext.fillStyle = '#aaa';
+        gridContext.fillRect(0, 0, grid[0].width, grid[0].height);
+    };
+    function cutOutUsedSquares() {
+        var squares = {{ squares | raw }};
+
+        for (var i = 0; i < squares.length; i = i + 2) {
+            cutOutSquare(squares[i] - 1, squares[i + 1] - 1);
+        }
+    };
+    function cutOutSquare(x, y) {
+        gridContext.clearRect(x * diffX, y * diffY, diffX, diffY);
+    }
+    function drawGrid() {
+        gridContext.beginPath();
+        for (var i = 0; i <= numberY; i++) {
+            gridContext.moveTo(0, i * diffY + 0.5);
+            gridContext.lineTo(grid[0].width, i * diffY + 0.5);
+        }
+        for (var i = 0; i <= numberX; i++) {
+            gridContext.moveTo(i * diffX + 0.5, 0);
+            gridContext.lineTo(i * diffX + 0.5, grid[0].height);
+        }
+        gridContext.lineWidth = gridLineWidth;
+        gridContext.strokeStyle = '#000';
+        gridContext.stroke();
+    };
+
+
+    $(".col-base.squareSize").click( function(event) {
+        markerCoord = getCoordinatesFrom(this.id);
+        if (isNotAt(squareContainer, squareXToPixel(markerCoord['X']), squareYToPixel(markerCoord['Y']))) {
+            $.ajax({
+                url:"{{ path('_squareContent') }}",
+                type:"POST",
+                data:{squareSelected: true,
+                      mapId: $('#square-finder-form input[type=hidden]').val(),
+                      coordX: markerCoord['X'],
+                      coordY: markerCoord['Y']},
+                success:function(data) {
+                    $("#square-form-row").removeAttr('style');
+                    $("#square-form-row .alert").removeAttr('style');
+                    squareContainer.fadeOut('fast');
+                    
+                    setTimeout(function() {
+                        $("#square-content").html(data.message);
+
+                        if (data.userCanBuyThisSquare) {
+                            $("#square-form-row").css('display', 'block');
+                        }
+
+                        moveMarkerTo(data.coordX, data.coordY);
+                        moveSquareContainerTo(data.coordX, data.coordY);
+                    }, 200);
+                    setTimeout(function() {
+                        squareContainer.fadeIn('slow');
+                    }, 400);
+                }
+            });
+        }
+        else {
+            squareContainer.fadeIn('slow');
+        }
+        event.stopImmediatePropagation();
+    });
+
+
+    $("#square-finder-submit").click( function(event) {
+        $.ajax({
+            url:"{{ path('_squareFinder') }}",
+            type:"POST",
+            data:$("#square-finder-form").serialize(),
+            success:function(data) {
+                $("#square-form-row").removeAttr('style');
+                $("#square-form-row .alert").removeAttr('style');
+                if (data.success) {
+                    if (isNotAt(squareContainer, squareXToPixel(data.coordX), squareYToPixel(data.coordY))) {
+                        squareContainer.fadeOut('fast');
+                    }
+
+                    setTimeout(function() {
+                        $("#square-content").html(data.message);
+
+                        if (data.userHasBoughtSquare) {
+                            moveMarkerTo(data.coordX, data.coordY);
+                            moveSquareContainerTo(data.coordX, data.coordY);
+                        }
+                        else {
+                            moveSquareContainerTo(2, 2);
+                        }
+                        $("#square-finder-error > span").html('');
+                        $("#square-finder-error").fadeOut('fast');
+                    }, 200);
+                    
+                    setTimeout(function() {
+                        squareContainer.fadeIn('slow');
+                    }, 400);
+                }
+                else {
+                    $("#square-finder-error > span").html(data.message);
+                    $("#square-finder-error").fadeIn('fast');
+                }
+            }
+        });
+        event.stopImmediatePropagation();
+        event.preventDefault();
+    });
+
+
+    $('#counter-form input[name=counter]').val("{{ map.getRemainingFreeSquares }} Bäume");
+    $("#square-form-submit").click( function(event){
+        $.ajax({
+            url: "{{ path('_squareSaver') }}",
+            type:"POST",
+            data:{squareForm: true,
+                  personalText: $('#square-form textarea').val(),
+                  mapId: $('#square-finder-form input[type=hidden]').val(),
+                  coordX: $('#square-form input[name=coordX]').val(),
+                  coordY: $('#square-form input[name=coordY]').val()
+                  },
+            success:function(data) {
+                if (data.success) {
+                    $("#square-form-row").removeAttr('style');
+                    $("#square-form-row .alert").removeAttr('style');
+                    $("#square-form").html(data.message);
+                    cutOutSquare(data.coordX - 1, data.coordY - 1);
+                    drawGrid();
+                    moveSquareContainerTo(data.coordX, data.coordY);
+                    squareContainer.fadeIn('fast');
+                    $.ajax({
+                        url: "{{ path('_updateCounter') }}",
+                        type:"POST",
+                        success:function(data) {$('#counter-form input[name=counter]').val(data.numberOfRemainingSquares + ' Bäume');}
+                    });
+                }
+                else {
+                    $("#square-form-error > span").html(data.message);
+                    $("#square-form-error").fadeIn();
+                }
+            }
+        });
+        event.stopImmediatePropagation();
+        event.preventDefault();
+    });
+
+
+    $("#square-close").click( function(event) {
+        squareContainer.fadeOut('fast');
+        event.stopImmediatePropagation();
+    });
+
+
+    function getCoordinatesFrom(squareId) {
+        var splitId = squareId.split("-");
+        return {X: splitId[1], Y: splitId[0]};
+    };
+
+
+    var offsetLeftViewport = gridViewport.offset().left;
+    var offsetTopViewport = gridViewport.offset().top;
+    function moveMarkerTo(coordX, coordY) {
+        var offsetLeft = offsetLeftViewport + gridLineWidth + (coordX - 0.5 - gridContainerLeft) * diffX - marker[0].width / 2;
+        var offsetTop = offsetTopViewport + gridLineWidth + (coordY - 0.25 - gridContainerTop) * diffY - marker[0].height;
+
+        if (isNotAt(marker, offsetLeft, offsetTop)) {
+            clearMarker();
+
+            marker.attr('style',
+                'left:' + offsetLeft + 'px;' + 
+                'top:' + offsetTop + 'px;' +
+                'display:block;'
+            );
+
+            animateMarker();
+        }
+    };
+    function moveSquareContainerTo(coordX, coordY) {
+        var offsetLeft = squareXToPixel(coordX);
+        var offsetTop = squareYToPixel(coordY);
+        
+        squareContainer.attr('style',
+            'left:' + offsetLeft + 'px;' + 
+            'top:' + offsetTop + 'px;'
+        );
+    };
+    var widthViewport = gridViewport.outerWidth();
+    function squareXToPixel(coordX) {
+        var width = $('#square-container').outerWidth();
+        var offsetLeft = offsetLeftViewport + (coordX - gridContainerLeft) * diffX + marker[0].width / 2;
+        if (offsetLeft >= offsetLeftViewport + widthViewport - width && offsetLeft > width + marker[0].width) {
+           offsetLeft = offsetLeft - width - marker[0].width;
+        }
+        return offsetLeft;
+    };
+    function squareYToPixel(coordY) {
+        var height = $('#square-container').outerHeight();
+        var offsetTop = offsetTopViewport + (coordY - 0.5 - gridContainerTop) * diffY - height - marker[0].height;
+        if (offsetTop <= offsetTopViewport) {
+           offsetTop = offsetTop + height + marker[0].height + 0.5 * diffY;
+        }
+        return offsetTop;
+    };
+    function clearMarker() {
+        markerContext.clearRect(0, 0, marker[0].width, marker[0].height);
+    };
+    function isNotAt(object, x, y) {
+        var position = object.position();
+
+        if (Math.abs(position.left - x) < 1 && Math.abs(position.top - y) < 1) {
+            return false;
+        }
+        return true;
+    };
+
+
+    var x_middle = parseInt(marker[0].width * 0.5),
+        y_start = marker[0].height - 5;
+    function animateMarker() {
+        var time = 0,
+            endTime = 20,
+            begin_width_2 = parseInt(marker[0].width * 0.5 * 0.7) - 1.5,
+            end_width_2 = parseInt(marker[0].width * 0.5) - 1.5,
+            diff_width_2 = (end_width_2 - begin_width_2) / (endTime / 3),
+            diff_y_top = (parseInt(marker[0].height * 0.3) - end_width_2 - 1.5) / (endTime / 3),
+            offset_y_jump = parseInt(marker[0].height * 0.1) / (endTime / 3);
+        var y_bottom = y_start,
+            y_top = y_start - parseInt(marker[0].height * 0.5),
+            width_2 = begin_width_2;
+        repeat();
+        function repeat() {
+            clearMarker();
+            drawMarkerCircle(y_start);
+            if (time < (endTime / 3)) {
+                width_2 = width_2 + diff_width_2;
+                y_top = y_top - diff_y_top;
+            }
+            else if (time < 2 * (endTime / 3)) {
+                y_bottom = y_bottom - offset_y_jump;
+                y_top = y_top - offset_y_jump;
+            }
+            else {
+                y_bottom = y_bottom + offset_y_jump;
+                y_top = y_top + offset_y_jump;
+            }
+            drawMarker(y_bottom, y_top, width_2);
+            
+            ++time;
+            if (time < endTime) {
+                window.requestAnimFrame(repeat);
+            }
+        };
+    };
+    function drawMarkerCircle(y_start) {
+        drawCircle(x_middle, y_start, 4, "#E1072A", "#F82345");
+    };
+    function drawMarker(y_bottom, y_top, width_2) {
+        markerContext.beginPath();
+        markerContext.moveTo(x_middle, y_bottom);
+        markerContext.bezierCurveTo(x_middle - width_2 * 0.5, y_top * 1.3, x_middle - width_2, y_top * 1.6, x_middle - width_2, y_top);
+        markerContext.arc(x_middle, y_top, width_2, Math.PI, 0);
+        markerContext.bezierCurveTo(x_middle + width_2, y_top * 1.6, x_middle + width_2 * 0.5, y_top * 1.3, x_middle, y_bottom);
+        markerContext.lineWidth = 1.5;
+        markerContext.strokeStyle = "#E1072A";
+        markerContext.fillStyle = "#F82345";
+        markerContext.fill();
+        markerContext.stroke();
+        
+        drawCircle(x_middle, y_top, width_2 * 0.2, "#000", "#000");
+    };
+    function drawCircle(x, y, radius, line_color, fill_color) {
+        markerContext.beginPath();
+        markerContext.arc(x, y, radius, 0, 2*Math.PI);
+        markerContext.lineWidth = 1.5;
+        markerContext.strokeStyle = line_color;
+        markerContext.fillStyle = fill_color;
+        markerContext.fill();
+        markerContext.stroke();
+    };
+
+    window.requestAnimFrame = function() {
+        return window.requestAnimationFrame ||
+               window.webkitRequestAnimationFrame ||
+               window.mozRequestAnimationFrame ||
+               window.msRequestAnimationFrame ||
+               window.oRequestAnimationFrame ||
+               function( callback ) {
+                  window.setTimeout(callback, 1000/60);
+               };
+    }();
+    /*]]>*/
+    </script>
+{% endblock %}

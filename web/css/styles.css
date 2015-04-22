@@ -1,0 +1,90 @@
+.foreground {
+    position: relative;
+    z-index: 10;
+}
+
+.no-margin {margin: 0px;}
+
+.col-base {
+    position: relative;
+    min-height: 1px;
+    float: left;
+    cursor: pointer;
+}
+
+#grid-viewport {
+    position: relative;
+    margin: 0px auto;
+    overflow: hidden;
+}
+
+#rainforest {
+    position: absolute;
+    z-index: 4;
+    top: 0px;
+    left: 0px;
+}
+
+#grid {
+    position: absolute;
+    z-index: 5;
+    top: 0px;
+    left: 0px;
+    opacity: 0.7;
+}
+
+#marker {
+    position: absolute;
+    z-index: 6;
+    display: none;
+}
+
+.btn-iams.btn-lg {padding: 17px 30px;}
+
+.alert {
+    display: none;
+    border-radius: 10px;
+}
+
+#square-container {
+    position: absolute;
+    z-index: 15;
+    display: none;
+    width: 20%;
+    padding: 10px;
+    background: #fff;
+    border-radius: 4px;
+    border: 1px solid #ccc;
+}
+#square-content {
+    margin-top: 30px;
+}
+
+#square-form-row {display: none;}
+
+#square-form-row .alert {margin: 5px 0px 0px 0px;}
+
+#counter-value {
+    float: none;
+    vertical-align: middle;
+}
+
+#login .modal-content {
+    height: 500px;
+}
+
+@media (max-width: 1199px) {
+    #square-container {width: 30%;}
+}
+
+@media (max-width: 991px) {
+    #square-container {width: 35%;}
+}
+
+@media (max-width: 767px) {
+    #square-container {width: 40%;}
+}
+
+@media (max-width: 540px) {
+    #square-container {width: 50%;}
+}

@@ -1,0 +1,3 @@
+iam_rainforest:
+    resource: "@IamRainforestBundle/Resources/config/routing.yml"
+    prefix:   /

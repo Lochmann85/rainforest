@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<doctrine-mapping xmlns="http://doctrine-project.org/schemas/orm/doctrine-mapping" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://doctrine-project.org/schemas/orm/doctrine-mapping http://doctrine-project.org/schemas/orm/doctrine-mapping.xsd">
+  <entity name="IamRainforestBundle\Entity\Map" table="map">
+    <id name="id" type="integer" column="id">
+      <generator strategy="IDENTITY"/>
+    </id>
+    <field name="description" type="text" column="description" nullable="false"/>
+    <field name="imageUrl" type="string" column="image_url" length="128" nullable="false"/>
+    <field name="width" type="integer" column="width" nullable="false"/>
+    <field name="numberX" type="integer" column="number_x" nullable="false"/>
+    <field name="height" type="integer" column="height" nullable="false"/>
+    <field name="numberY" type="integer" column="number_y" nullable="false"/>
+  </entity>
+</doctrine-mapping>

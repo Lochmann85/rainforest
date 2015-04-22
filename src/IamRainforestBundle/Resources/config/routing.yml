@@ -1,0 +1,3 @@
+_rainforest_default:
+    resource: "@IamRainforestBundle/Controller/DefaultController.php"
+    type:     annotation
