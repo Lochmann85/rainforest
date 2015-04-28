@@ -4,6 +4,7 @@
     <id name="id" type="integer" column="id">
       <generator strategy="IDENTITY"/>
     </id>
+    <field name="slug" type="string" column="slug" length="128" nullable="false"/>
     <field name="description" type="text" column="description" nullable="false"/>
     <field name="imageUrl" type="string" column="image_url" length="128" nullable="false"/>
     <field name="width" type="integer" column="width" nullable="false"/>

@@ -7,8 +7,6 @@ use Symfony\Bundle\FrameworkBundle\Controller\Controller;
 
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\JsonResponse;
-use Symfony\Component\Validator\Constraints\Email;
-use Symfony\Component\Validator\Constraints\NotBlank;
 
 use IamRainforestBundle\Component\MapWidget;
 use IamRainforestBundle\Entity\Square;
@@ -17,25 +15,35 @@ class DefaultController extends Controller {
     /**
      * @Route("/", name="_rainforest")
      */
-    public function indexAction() {
-        $em = $this->getDoctrine()->getManager();
+    public function indexAction(Request $request) {
+        if ($request->query->has('map')) {
+            return $this->createSiteWithMapFrom($request->query);
+        }
+        else throw new \Exception('Wrong site called, check for slug');
+    }
+    
+    private function createSiteWithMapFrom($get) {
+        $mapManager = $this->get('mapManager');
         
-        $mapRepository = $em->getRepository('IamRainforestBundle:Map');
-        $mapEntity = $mapRepository->find(1); //!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! find map with id=1 !!!!!!!!!!!!!!!!!!!!!!!!!!!!
+        $mapEntity = $mapManager->findMapBySlug($get->get('map'));
 
-        $squaresRepository = $em->getRepository('IamRainforestBundle:Square');
-        $squareEntities = $squaresRepository->findBy(array('map' => $mapEntity));
-        
+        if (isset($mapEntity)) {
+            return $this->renderSiteForVisitor($get, $mapManager, $mapEntity);
+        }
+        else throw new \Exception('The searched map: ' . $get->get('map') . ' does not exist.');
+    }
+    
+    private function renderSiteForVisitor($get, $mapManager, $mapEntity) {
+        $squareEntities = $mapManager->findAllSquaresIn($mapEntity);
+
         $squares = $this->convertSquaresToJavaArray($squareEntities);
         $map = new MapWidget($mapEntity, $squareEntities);
 
-        $isGuest = false; //!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! is logged in !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-        
         return $this->render('IamRainforestBundle:Default:index.html.twig', array(
             'mapEntity' => $mapEntity,
             'map' => $map,
             'squares' => $squares,
-            'isGuest' => $isGuest
+            'userId' => $get->get('user')
         ));
     }
     
@@ -51,7 +59,7 @@ class DefaultController extends Controller {
         }
         return $squaresAsString . ']';
     }
-
+    
     
     /**
      * @Route("/squareContent", name="_squareContent")
@@ -68,22 +76,19 @@ class DefaultController extends Controller {
         $message = null;
         $userCanBuyThisSquare = false;
         
-        $em = $this->getDoctrine()->getManager();
+        $mapManager = $this->get('mapManager');
+        $mapEntity = $mapManager->findMapById($post->get('mapId'));
 
-        $mapRepository = $em->getRepository('IamRainforestBundle:Map');
-        $mapEntity = $mapRepository->find($post->get('mapId'));
-        
-        $squaresRepository = $em->getRepository('IamRainforestBundle:Square');
-        $squareEntity = $squaresRepository->findOneBy(array(
-            'map' => $mapEntity,
-            'coordX' => $post->get('coordX'),
-            'coordY' => $post->get('coordY')
-        ));
+        $squareEntity = $mapManager->findSquareAt(
+            $mapEntity,
+            $post->get('coordX'),
+            $post->get('coordY')
+        );
         if (isset($squareEntity)) {
             $message = $this->renderContentForBought($squareEntity);
         }
         else {
-            $result = $this->renderContentForVisitor($mapEntity, $em, $post);
+            $result = $this->renderContentForVisitor($mapEntity, $mapManager, $post);
             $message = $result['message'];
             $userCanBuyThisSquare = $result['userCanBuyThisSquare'];
         }
@@ -96,16 +101,17 @@ class DefaultController extends Controller {
         );
     }
 
-    function renderContentForVisitor($mapEntity, $em, $post) {
+    private function renderContentForVisitor($mapEntity, $mapManager, $post) {
         $message = null;
         $userCanBuyThisSquare = false;
 
-        $userEntity = $em->getRepository('IamRainforestBundle:User')->findOneBy(array('id' => 1));
+        $user = $this->decryptUserIdFrom($post->get('userId'));
 
-        if (isset($userEntity)) {//!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! && is logged in !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-             $result = $this->renderContentForLoggedIn($userEntity, $mapEntity, $em, $post);
-             $message = $result['message'];
-             $userCanBuyThisSquare = $result['userCanBuyThisSquare'];
+        if (isset($user)) {
+            $squareEntity = $mapManager->findSquareWithUserId($mapEntity, $user);
+            $result = $this->renderContentForLoggedInUser($squareEntity, $post);
+            $message = $result['message'];
+            $userCanBuyThisSquare = $result['userCanBuyThisSquare'];
         }
         else {
             $message = $this->renderRegistrationForm();
@@ -117,14 +123,17 @@ class DefaultController extends Controller {
         );
     }
     
-    function renderContentForLoggedIn($userEntity, $mapEntity, $em, $post) {
+    private function decryptUserIdFrom($userIdPost) { //!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! encrypt decrypt user id !!!!!!!!!!!!!!
+        if (isset($userIdPost) && $userIdPost !== '') {
+            return $userIdPost;
+        }
+        else {
+            return null;
+        }
+    }
+    
+    private function renderContentForLoggedInUser($squareEntity, $post) {
         $message = null;
-        
-        $squaresRepository = $em->getRepository('IamRainforestBundle:Square');
-        $squareEntity = $squaresRepository->findOneBy(array(
-            'map' => $mapEntity,
-            'user' => $userEntity
-        ));
         
         if (isset($squareEntity)) {
             $message = $this->renderContentForUserWithBought($squareEntity);
@@ -147,87 +156,34 @@ class DefaultController extends Controller {
     public function squareFinderAction(Request $request) {
         $result = null;
         if ($request->request->has('map-id')) {
-            $result = $this->findSquareByEmail($request->request);
+            $result = $this->findSquareForRegisteredUser($request->request);
         }
         return new JsonResponse($result);
     }
     
-    private function findSquareByEmail($post) {
-        if ($this->eMailIsCorrect($post)) {
-            return $this->findSquareForVisitor($post);
-        }
-        else {
-            return array(
-                'success' => false,
-                'message' => 'Bitte gib eine richtige E-Mail Adresse ein.'
-            );
-        }
-    }
-    
-    private function eMailIsCorrect($post) {
-        $validator = $this->container->get('validator');
-        $constraints = array(new Email(), new NotBlank());
-        $errors = $validator->validate($post->get('email'), $constraints);
-        return count($errors) === 0;
-    }
-    
-    private function findSquareForVisitor($post) {
+    private function findSquareForRegisteredUser($post) {
         $message = null;
         $coordX = null;
         $coordY = null;
 
-        $em = $this->getDoctrine()->getManager();
-        $userEntity = $em->getRepository('IamRainforestBundle:User')->findOneBy(array('email' => $post->get('email')));
+        $mapManager = $this->get('mapManager');
+        $mapEntity = $mapManager->findMapById($post->get('map-id'));
 
-        if (isset($userEntity)) {
-            $square = $this->findSquareForRegistered($userEntity, $em, $post);
-
-            $message = $square['message'];
-            $coordX = $square['coordX'];
-            $coordY = $square['coordY'];
-            $userHasBoughtSquare = $square['userHasBoughtSquare'];
-        }
-        else {
-            $message = $this->renderRegistrationForm();
-            $userHasBoughtSquare = false;
-        }
-        return array(
-            'success' => true,
-            'message' => $message,
-            'userHasBoughtSquare' => $userHasBoughtSquare,
-            'coordX' => $coordX,
-            'coordY' => $coordY
-        );
-    }
-    
-    private function findSquareForRegistered($userEntity, $em, $post) {
-        $message = null;
-        $coordX = null;
-        $coordY = null;
-
-        $mapRepository = $em->getRepository('IamRainforestBundle:Map');
-        $mapEntity = $mapRepository->find($post->get('map-id'));
-
-        $squaresRepository = $em->getRepository('IamRainforestBundle:Square');
-        $squareEntity = $squaresRepository->findOneBy(array(
-            'map' => $mapEntity,
-            'user' => $userEntity
-        ));
+        $user = $this->decryptUserIdFrom($post->get('user-id'));
+        
+        $squareEntity = $mapManager->findSquareWithUserId($mapEntity, $user);
         if (isset($squareEntity)) {
             $message = $this->renderContentForBought($squareEntity);
             $coordX = $squareEntity->getCoordX();
             $coordY = $squareEntity->getCoordY();
             $userHasBoughtSquare = true;
         }
-        else if (true){//!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! && is logged in !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+        else {
             $message = $this->renderContentForFreeSquare(null);
             $userHasBoughtSquare = false;
         }
-        else {
-            $message = $this->renderRegistrationForm();
-            $userHasBoughtSquare = false;
-        }
         return array(
+            'success' => true,
             'message' => $message,
             'coordX' => $coordX,
             'coordY' => $coordY,
@@ -263,22 +219,19 @@ class DefaultController extends Controller {
     }
     
     private function saveSquareToUser($post) {
-        $em = $this->getDoctrine()->getManager();
-
-        $mapRepository = $em->getRepository('IamRainforestBundle:Map');
-        $mapEntity = $mapRepository->find($post->get('mapId'));
-        $userEntity = $em->getRepository('IamRainforestBundle:User')->findOneBy(array('id' => 1));
+        $mapManager = $this->get('mapManager');
+        $mapEntity = $mapManager->findMapById($post->get('mapId'));
+        $user = $this->decryptUserIdFrom($post->get('userId'));
         
         $squareEntity = new Square();
 
         $squareEntity->setMap($mapEntity);
-        $squareEntity->setUser($userEntity);
+        $squareEntity->setUserId($user);
         $squareEntity->setCoordX($post->get('coordX'));
         $squareEntity->setCoordY($post->get('coordY'));
         $squareEntity->setPersonalText($post->get('personalText'));
 
-        $em->persist($squareEntity);
-        $em->flush();
+        $mapManager->saveNew($squareEntity);
         
         return 'Danke, dass du uns mit der Rettung des Regenwaldes unterstützt!';
     }
@@ -287,18 +240,23 @@ class DefaultController extends Controller {
     /**
      * @Route("/updateCounter", name="_updateCounter")
      */
-    public function updateCounterAction() {
-        $em = $this->getDoctrine()->getManager();
-        
-        $mapRepository = $em->getRepository('IamRainforestBundle:Map');
-        $mapEntity = $mapRepository->find(1); //!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! find map with id=1 !!!!!!!!!!!!!!!!!!!!!!!!!!!!
+    public function updateCounterAction(Request $request) {
+        $result = null;
+        if ($request->request->get('updateCounter')) {
+            $result = $this->manageCounterReset($request->request);
+        }
+        return new JsonResponse($result);
+    }
+    
+    private function manageCounterReset($post) {
+        $mapManager = $this->get('mapManager');
+        $mapEntity = $mapManager->findMapById($post->get('mapId'));
 
-        $squaresRepository = $em->getRepository('IamRainforestBundle:Square');
-        $squareEntities = $squaresRepository->findBy(array('map' => $mapEntity));
+        $squareEntities = $mapManager->findAllSquaresIn($mapEntity);
 
         $map = new MapWidget($mapEntity, $squareEntities);
 
-        return new JsonResponse(array('numberOfRemainingSquares' => $map->getRemainingFreeSquares()));
+        return array('numberOfRemainingSquares' => $map->getRemainingFreeSquares());
     }
     
     private function renderRegistrationForm() {

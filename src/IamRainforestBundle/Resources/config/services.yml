@@ -1,4 +1,4 @@
 services:
-#    iam_rainforest.example:
-#        class: IamRainforestBundle\Example
-#        arguments: [@service_id, "plain_value", %parameter%]
+    mapManager:
+        class: IamRainforestBundle\Component\MapManager
+        arguments: ["@doctrine.orm.entity_manager"]

@@ -69,9 +69,6 @@
     vertical-align: middle;
 }
 
-#login .modal-content {
-    height: 500px;
-}
 
 @media (max-width: 1199px) {
     #square-container {width: 30%;}

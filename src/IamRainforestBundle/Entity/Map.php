@@ -12,6 +12,11 @@ class Map
     /**
      * @var string
      */
+    private $slug;
+
+    /**
+     * @var string
+     */
     private $description;
 
     /**
@@ -44,6 +49,29 @@ class Map
      */
     private $id;
 
+
+    /**
+     * Set slug
+     *
+     * @param string $slug
+     * @return Map
+     */
+    public function setSlug($slug)
+    {
+        $this->slug = $slug;
+
+        return $this;
+    }
+
+    /**
+     * Get slug
+     *
+     * @return string 
+     */
+    public function getSlug()
+    {
+        return $this->slug;
+    }
 
     /**
      * Set description

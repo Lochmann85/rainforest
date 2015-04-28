@@ -18,34 +18,19 @@
                 <h2>{{ mapEntity.getDescription | raw }}</h2>
             </div>
         </div>
-        <div class="row">
-            <div class="col-xs-10">
-                Finde deinen Baum:
-            </div>
-        </div>
+        {% if (userId) %}
         <form id="square-finder-form" class="row">
-            <input type="hidden" name="map-id" value="{{ mapEntity.getId }}"/>
             <fieldset>
-                <div class="col-xs-2">
-                    <div class="input-group">
-                        <span class="input-group-addon">
-                            <i class="fa fa-envelope text-jumbo margin-right-half margin-left-half"></i>
-                        </span>
-                        <input class="form-control" type="email" placeholder="Deine E-Mail-Adresse" name="email">
-                    </div>
-                </div>
-                <button id="square-finder-submit" type="submit" form="square-finder-form" class="btn btn-lg btn-iams">Suchen</button>
+                <input type="hidden" name="map-id" value="{{ mapEntity.getId }}"/>
+                <input type="hidden" name="user-id" value="{{ userId }}"/>
+                <button id="square-finder-submit" type="submit" form="square-finder-form" class="btn btn-lg btn-iams">Finde deinen Baum</button>
             </fieldset>
         </form>
-        <div class="row">
-            <div class="col-xs-3">
-                <div id="square-finder-error" class="alert alert-danger">
-                    <span></span>
-                </div>
-            </div>
-        </div>
+        {% endif %}
         <form id="counter-form" class="row">
             <fieldset>
+                <input type="hidden" name="map-id" value="{{ mapEntity.getId }}"/>
+                <input type="hidden" name="user-id" value="{{ userId }}"/>
                 <div class="col-xs-2">
                     <div class="input-group">
                         <span class="input-group-addon">
@@ -86,39 +71,14 @@
                 <div id="square-form-error" class="alert alert-danger"><span></span></div>
             </div>
         </div>
-        <div id="login" class="modal fade" aria-hidden="true" aria-labelledby="loginModalLabel" tabindex="-1">
-            <div class="modal-dialog">
-                <div class="modal-content">
-                    <div class="modal-header">
-                        <button type="button" class="close" data-dismiss="modal" aria-hidden="true">×</button>
-                        <h4 class="modal-title" id="loginModalLabel">Login</h4>
-                    </div>
-                    <div class="modal-body">
-                        Bitte einloggen / registrieren
-                    </div>
-                    <div class="modal-footer">
-                        <span class="text-small">falls du dich nicht registrieren möchtest klicke auf X</span>
-                    </div>
-                </div>
-            </div>
-        </div>
     </div>
 {% endblock %}
 
 {% block javascripts %}
     <script type="text/javascript" src="js/jquery.min.js"></script>
     <script type="text/javascript" src="js/bootstrap.min.js"></script>
-    <script type="text/javascript" src="js/main.js"></script>
     <script type="text/javascript">
     /*<![CDATA[*/
-    {% if(isGuest) %}
-        $("#login").modal("show");
-    {% endif %}
-
-    var gridViewport = $('#grid-viewport');
-    var gridContainer = $('#grid-container');
-    var gridContainerLeft = 0;
-    var gridContainerTop = 0;
 
     var grid = $('#grid');
     grid[0].width = {{ mapEntity.getWidth }} + 1;
@@ -131,102 +91,7 @@
     var numberY = {{ mapEntity.getNumberY }},
         diffY = {{ map.getSquareHeight }};
     
-
-    var marker = $('#marker');
-    var markerContext = marker[0].getContext('2d');
-    var markerCoord = {X: 0, Y: 0};
-
     var squareContainer = $('#square-container');
-
-
-    window.addEventListener('resize', resizeGridViewportOnBrowserResize );
-    function resizeGridViewportOnBrowserResize() {
-        resizeGridViewport();
-        offsetLeftViewport = gridViewport.offset().left;
-        offsetTopViewport = gridViewport.offset().top;
-        widthViewport = gridViewport.outerWidth();
-        clearViewportSelection();
-        gridContainerLeft = 0;
-        gridContainerTop = 0;
-        gridContainer.removeAttr('style');
-    };
-    function clearViewportSelection() {
-        clearMarker();
-        squareContainer.fadeOut('fast');
-    };
-
-    resizeGridViewport();
-
-    function resizeGridViewport() {
-        var bodyWidth = $('body').width();
-        if (bodyWidth <= 767) {
-            setUpGridViewport(bodyWidth * 0.95);
-        }
-        else if (bodyWidth <= 991) {
-            setUpGridViewport(parseInt(bodyWidth * 0.9));
-        }
-        else if (bodyWidth <= 1199) {
-            setUpGridViewport(parseInt(bodyWidth * 0.8));
-        }
-        else {
-            setUpGridViewport(parseInt(bodyWidth * 0.7));
-        }
-    };
-    function setUpGridViewport(width) {
-        gridViewport.width(biggestGridSize(width, diffX, numberX));
-        gridViewport.height(biggestGridSize(gridViewport.width(), diffY, numberY));
-    };
-    function biggestGridSize(width, squareSize, squareNumber) {
-        var ratio = Math.floor(width / squareSize);
-        if (ratio >= squareNumber) {
-            ratio = squareNumber;
-        }
-        return ratio * squareSize + gridLineWidth;
-    };
-    
-    
-    $('#goLeft').click(function(event) {
-        var hiddenSquares = numberX - Math.floor(gridViewport.width() / diffX);
-        gridContainerLeft = raiseIfInsideBoundingBox(gridContainerLeft, hiddenSquares);
-        
-        var offsetInPixel = -gridContainerLeft * diffX;
-        gridContainer.css('left', offsetInPixel + 'px');
-
-        clearViewportSelection()
-    });
-    $('#goRight').click(function(event) {
-        gridContainerLeft = decreaseIfInsideBoundingBox(gridContainerLeft, 0);
-        
-        var offsetInPixel = -gridContainerLeft * diffX;
-        gridContainer.css('left', offsetInPixel + 'px');
-        
-        clearViewportSelection()
-    });
-    $('#goDown').click(function(event) {
-        var hiddenSquares = numberY - Math.floor(gridViewport.height() / diffY);
-        gridContainerTop = raiseIfInsideBoundingBox(gridContainerTop, hiddenSquares);
-        
-        var offsetInPixel = -gridContainerTop * diffY;
-        gridContainer.css('top', offsetInPixel + 'px');
-        
-        clearViewportSelection()
-    });
-    $('#goUp').click(function(event) {
-        gridContainerTop = decreaseIfInsideBoundingBox(gridContainerTop, 0);
-        
-        var offsetInPixel = -gridContainerTop * diffY;
-        gridContainer.css('top', offsetInPixel + 'px');
-        
-        clearViewportSelection()
-    });
-    function raiseIfInsideBoundingBox(offset, border) {
-        markerCoord['X'] = markerCoord['X'] - 1;
-        return offset + 1 > border ? offset : offset + 1;
-    };
-    function decreaseIfInsideBoundingBox(offset, border) {
-        return offset - 1 < border ? offset : offset - 1;
-    };
-    
 
     fillWithBackground();
     cutOutUsedSquares();
@@ -263,6 +128,7 @@
     };
 
 
+    var markerCoord = {X: 0, Y: 0};
     $(".col-base.squareSize").click( function(event) {
         markerCoord = getCoordinatesFrom(this.id);
         if (isNotAt(squareContainer, squareXToPixel(markerCoord['X']), squareYToPixel(markerCoord['Y']))) {
@@ -270,7 +136,8 @@
                 url:"{{ path('_squareContent') }}",
                 type:"POST",
                 data:{squareSelected: true,
-                      mapId: $('#square-finder-form input[type=hidden]').val(),
+                      mapId: $('#counter-form input[name=map-id]').val(),
+                      userId: $('#counter-form input[name=user-id]').val(),
                       coordX: markerCoord['X'],
                       coordY: markerCoord['Y']},
                 success:function(data) {
@@ -299,6 +166,19 @@
         }
         event.stopImmediatePropagation();
     });
+    function getCoordinatesFrom(squareId) {
+        var splitId = squareId.split("-");
+        return {X: splitId[1], Y: splitId[0]};
+    };
+    function isNotAt(object, x, y) {
+        var positionLeft = parseInt(object.css('left')),
+            positionTop = parseInt(object.css('top'));
+
+        if (Math.abs(positionLeft - x) < 1 && Math.abs(positionTop - y) < 1) {
+            return false;
+        }
+        return true;
+    };
 
 
     $("#square-finder-submit").click( function(event) {
@@ -318,10 +198,20 @@
                         $("#square-content").html(data.message);
 
                         if (data.userHasBoughtSquare) {
+                            gridContainerLeft = find_X_PositionOnWholeMap(data);
+                            moveGridContainerToLeft(gridContainerLeft);
+
+                            gridContainerTop = find_Y_PositionOnWholeMap(data);
+                            moveGridContainerToTop(gridContainerTop);
+
                             moveMarkerTo(data.coordX, data.coordY);
                             moveSquareContainerTo(data.coordX, data.coordY);
                         }
                         else {
+                            gridContainerLeft = 0;
+                            moveGridContainerToLeft(gridContainerLeft);
+                            gridContainerTop = 0;
+                            moveGridContainerToTop(gridContainerTop);
                             moveSquareContainerTo(2, 2);
                         }
                         $("#square-finder-error > span").html('');
@@ -341,6 +231,26 @@
         event.stopImmediatePropagation();
         event.preventDefault();
     });
+    function find_X_PositionOnWholeMap(data) {
+        var centerMarker = data.coordX - Math.floor(viewportWidthInSquares / 2);
+        if (data.coordX <= gridContainerLeft) {
+            return centerMarker > 0 ? centerMarker : 0;
+        }
+        else if (gridContainerLeft + viewportWidthInSquares <= data.coordX) {
+            return centerMarker + viewportWidthInSquares < numberX ? centerMarker : numberX - viewportWidthInSquares;
+        }
+        else return gridContainerLeft;
+    };
+    function find_Y_PositionOnWholeMap(data) {
+        var centerMarker = data.coordY - Math.floor(viewportHeightInSquares / 2);
+        if (data.coordY <= gridContainerTop) {
+            return centerMarker > 0 ? centerMarker : 0;
+        }
+        else if (gridContainerTop + viewportHeightInSquares <= data.coordY) {
+            return centerMarker + viewportHeightInSquares < numberY ? centerMarker : numberY - viewportHeightInSquares;
+        }
+        else return gridContainerTop;
+    };
 
 
     $('#counter-form input[name=counter]').val("{{ map.getRemainingFreeSquares }} Bäume");
@@ -350,7 +260,8 @@
             type:"POST",
             data:{squareForm: true,
                   personalText: $('#square-form textarea').val(),
-                  mapId: $('#square-finder-form input[type=hidden]').val(),
+                  mapId: $('#counter-form input[name=map-id]').val(),
+                  userId: $('#counter-form input[name=user-id]').val(),
                   coordX: $('#square-form input[name=coordX]').val(),
                   coordY: $('#square-form input[name=coordY]').val()
                   },
@@ -366,6 +277,9 @@
                     $.ajax({
                         url: "{{ path('_updateCounter') }}",
                         type:"POST",
+                        data:{updateCounter: true,
+                              mapId: $('#counter-form input[name=map-id]').val()
+                        },
                         success:function(data) {$('#counter-form input[name=counter]').val(data.numberOfRemainingSquares + ' Bäume');}
                     });
                 }
@@ -384,145 +298,8 @@
         squareContainer.fadeOut('fast');
         event.stopImmediatePropagation();
     });
-
-
-    function getCoordinatesFrom(squareId) {
-        var splitId = squareId.split("-");
-        return {X: splitId[1], Y: splitId[0]};
-    };
-
-
-    var offsetLeftViewport = gridViewport.offset().left;
-    var offsetTopViewport = gridViewport.offset().top;
-    function moveMarkerTo(coordX, coordY) {
-        var offsetLeft = offsetLeftViewport + gridLineWidth + (coordX - 0.5 - gridContainerLeft) * diffX - marker[0].width / 2;
-        var offsetTop = offsetTopViewport + gridLineWidth + (coordY - 0.25 - gridContainerTop) * diffY - marker[0].height;
-
-        if (isNotAt(marker, offsetLeft, offsetTop)) {
-            clearMarker();
-
-            marker.attr('style',
-                'left:' + offsetLeft + 'px;' + 
-                'top:' + offsetTop + 'px;' +
-                'display:block;'
-            );
-
-            animateMarker();
-        }
-    };
-    function moveSquareContainerTo(coordX, coordY) {
-        var offsetLeft = squareXToPixel(coordX);
-        var offsetTop = squareYToPixel(coordY);
-        
-        squareContainer.attr('style',
-            'left:' + offsetLeft + 'px;' + 
-            'top:' + offsetTop + 'px;'
-        );
-    };
-    var widthViewport = gridViewport.outerWidth();
-    function squareXToPixel(coordX) {
-        var width = $('#square-container').outerWidth();
-        var offsetLeft = offsetLeftViewport + (coordX - gridContainerLeft) * diffX + marker[0].width / 2;
-        if (offsetLeft >= offsetLeftViewport + widthViewport - width && offsetLeft > width + marker[0].width) {
-           offsetLeft = offsetLeft - width - marker[0].width;
-        }
-        return offsetLeft;
-    };
-    function squareYToPixel(coordY) {
-        var height = $('#square-container').outerHeight();
-        var offsetTop = offsetTopViewport + (coordY - 0.5 - gridContainerTop) * diffY - height - marker[0].height;
-        if (offsetTop <= offsetTopViewport) {
-           offsetTop = offsetTop + height + marker[0].height + 0.5 * diffY;
-        }
-        return offsetTop;
-    };
-    function clearMarker() {
-        markerContext.clearRect(0, 0, marker[0].width, marker[0].height);
-    };
-    function isNotAt(object, x, y) {
-        var position = object.position();
-
-        if (Math.abs(position.left - x) < 1 && Math.abs(position.top - y) < 1) {
-            return false;
-        }
-        return true;
-    };
-
-
-    var x_middle = parseInt(marker[0].width * 0.5),
-        y_start = marker[0].height - 5;
-    function animateMarker() {
-        var time = 0,
-            endTime = 20,
-            begin_width_2 = parseInt(marker[0].width * 0.5 * 0.7) - 1.5,
-            end_width_2 = parseInt(marker[0].width * 0.5) - 1.5,
-            diff_width_2 = (end_width_2 - begin_width_2) / (endTime / 3),
-            diff_y_top = (parseInt(marker[0].height * 0.3) - end_width_2 - 1.5) / (endTime / 3),
-            offset_y_jump = parseInt(marker[0].height * 0.1) / (endTime / 3);
-        var y_bottom = y_start,
-            y_top = y_start - parseInt(marker[0].height * 0.5),
-            width_2 = begin_width_2;
-        repeat();
-        function repeat() {
-            clearMarker();
-            drawMarkerCircle(y_start);
-            if (time < (endTime / 3)) {
-                width_2 = width_2 + diff_width_2;
-                y_top = y_top - diff_y_top;
-            }
-            else if (time < 2 * (endTime / 3)) {
-                y_bottom = y_bottom - offset_y_jump;
-                y_top = y_top - offset_y_jump;
-            }
-            else {
-                y_bottom = y_bottom + offset_y_jump;
-                y_top = y_top + offset_y_jump;
-            }
-            drawMarker(y_bottom, y_top, width_2);
-            
-            ++time;
-            if (time < endTime) {
-                window.requestAnimFrame(repeat);
-            }
-        };
-    };
-    function drawMarkerCircle(y_start) {
-        drawCircle(x_middle, y_start, 4, "#E1072A", "#F82345");
-    };
-    function drawMarker(y_bottom, y_top, width_2) {
-        markerContext.beginPath();
-        markerContext.moveTo(x_middle, y_bottom);
-        markerContext.bezierCurveTo(x_middle - width_2 * 0.5, y_top * 1.3, x_middle - width_2, y_top * 1.6, x_middle - width_2, y_top);
-        markerContext.arc(x_middle, y_top, width_2, Math.PI, 0);
-        markerContext.bezierCurveTo(x_middle + width_2, y_top * 1.6, x_middle + width_2 * 0.5, y_top * 1.3, x_middle, y_bottom);
-        markerContext.lineWidth = 1.5;
-        markerContext.strokeStyle = "#E1072A";
-        markerContext.fillStyle = "#F82345";
-        markerContext.fill();
-        markerContext.stroke();
-        
-        drawCircle(x_middle, y_top, width_2 * 0.2, "#000", "#000");
-    };
-    function drawCircle(x, y, radius, line_color, fill_color) {
-        markerContext.beginPath();
-        markerContext.arc(x, y, radius, 0, 2*Math.PI);
-        markerContext.lineWidth = 1.5;
-        markerContext.strokeStyle = line_color;
-        markerContext.fillStyle = fill_color;
-        markerContext.fill();
-        markerContext.stroke();
-    };
-
-    window.requestAnimFrame = function() {
-        return window.requestAnimationFrame ||
-               window.webkitRequestAnimationFrame ||
-               window.mozRequestAnimationFrame ||
-               window.msRequestAnimationFrame ||
-               window.oRequestAnimationFrame ||
-               function( callback ) {
-                  window.setTimeout(callback, 1000/60);
-               };
-    }();
     /*]]>*/
     </script>
+    <script type="text/javascript" src="js/viewport.js"></script>
+    <script type="text/javascript" src="js/squareMarkerAndContent.js"></script>
 {% endblock %}

@@ -12,6 +12,11 @@ class Square
     /**
      * @var integer
      */
+    private $userId;
+
+    /**
+     * @var integer
+     */
     private $coordX;
 
     /**
@@ -35,15 +40,33 @@ class Square
     private $id;
 
     /**
-     * @var \IamRainforestBundle\Entity\User
-     */
-    private $user;
-
-    /**
      * @var \IamRainforestBundle\Entity\Map
      */
     private $map;
 
+
+    /**
+     * Set userId
+     *
+     * @param integer $userId
+     * @return Square
+     */
+    public function setUserId($userId)
+    {
+        $this->userId = $userId;
+
+        return $this;
+    }
+
+    /**
+     * Get userId
+     *
+     * @return integer 
+     */
+    public function getUserId()
+    {
+        return $this->userId;
+    }
 
     /**
      * Set coordX
@@ -145,29 +168,6 @@ class Square
     public function getId()
     {
         return $this->id;
-    }
-
-    /**
-     * Set user
-     *
-     * @param \IamRainforestBundle\Entity\User $user
-     * @return Square
-     */
-    public function setUser(\IamRainforestBundle\Entity\User $user = null)
-    {
-        $this->user = $user;
-
-        return $this;
-    }
-
-    /**
-     * Get user
-     *
-     * @return \IamRainforestBundle\Entity\User 
-     */
-    public function getUser()
-    {
-        return $this->user;
     }
 
     /**

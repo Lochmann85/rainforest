@@ -8,15 +8,11 @@
     <id name="id" type="integer" column="id">
       <generator strategy="IDENTITY"/>
     </id>
+    <field name="userId" type="integer" column="user_id" nullable="false"/>
     <field name="coordX" type="integer" column="coord_x" nullable="false"/>
     <field name="coordY" type="integer" column="coord_y" nullable="false"/>
     <field name="boughtAt" type="datetime" column="bought_at" nullable="false"/>
     <field name="personalText" type="text" column="personal_text" nullable="false"/>
-    <many-to-one field="user" target-entity="User">
-      <join-columns>
-        <join-column name="user_id" referenced-column-name="id"/>
-      </join-columns>
-    </many-to-one>
     <many-to-one field="map" target-entity="Map">
       <join-columns>
         <join-column name="map_id" referenced-column-name="id"/>
